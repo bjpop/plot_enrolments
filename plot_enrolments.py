@@ -55,7 +55,7 @@ optional arguments:
 
 Command line example:
 
-   ./plot_enrolments.py --epoch '28-JUL-1933' --title "My Subject Semester 2 2014" \
+   ./plot_enrolments.py --epoch '28-JUL-1933' --title "My Subject Semester 2 1933" \
                         --output enrolments.png --low 28 \
                         --label --labelx 30 --labely '160' fake_enrolments.csv
 
@@ -71,6 +71,7 @@ import csv
 from argparse import ArgumentParser
 import time
 from collections import namedtuple
+from operator import attrgetter
 
 DESCRIPTION = 'Plot a graph of student enrolments given CSV file downloaded from the LMS'
 DATE_FORMAT = '%d-%b-%Y %H:%M'
@@ -140,6 +141,10 @@ def days_difference(time_recent, time_older):
     return int((time_recent - time_older) / SECONDS_PER_DAY)
 
 def process_records(args, records):
+    # Keep track of the running total of students.
+    # When we see an 'Added' record we increment the total
+    # and when we see a 'Removed' record we decrement the total.
+    # We assume that enrolments start at zero at the beginning.
     num_students = 0
     histogram = {}
     # set the epoch time to the last minute of the epoch day
@@ -163,29 +168,40 @@ def process_records(args, records):
             num_students.append(num)
     plot_data(days, num_students, args)
 
+def parse_row(row):
+    '''Rows in the input file have this format:
+
+    DATE_TIME,LAST_NAME,GIVEN_NAMES,STUDENT_NUMBER,USERNAME,ACTION
+    '''
+    if len(row) == NUM_FIELDS:
+        date_time_str, action = row[0], row[-1]
+        if action in ['Added', 'Removed']:
+            time_of_event = parse_date_time(date_time_str)
+            return Record(time=time_of_event, action=action)
+    # Can't parse this row for some reason
+    return None
+
 def read_records(csv_filename):
     '''Read each record from the input CSV file'''
     records = []
     with open(csv_filename) as csv_file:
         reader = csv.reader(csv_file)
         for row in reader:
-            if len(row) == NUM_FIELDS:
-                time_of_event_str, action = row[0], row[-1]
-                if action in ['Added', 'Removed']:
-                    time_of_event = parse_date_time(time_of_event_str)
-                    record = Record(time=time_of_event, action=action)
-                    records.append(record)
-                else:
-                    print("Unrecogonised action, skipping: {}".format(row))
+            record = parse_row(row)
+            if record:
+                records.append(record)
+            else:
+                print("Skipping unrecogonised row in input file: {}".format(row))
     return records
 
 def main():
     args = parse_args()
     records = read_records(args.csv_filename)
     if records:
-        # The CSV file is in reverse temporal order (youngest date on first line).
-        # We reverse them to put them in normal temporal order.
-        records = list(reversed(records))
+        # We don't want to rely on the records being in any particular
+        # chronological order, so we sort them in ascending order of
+        # time.
+        records = sorted(records, key=attrgetter('time'))
         process_records(args, records)
 
 if __name__ == '__main__':
