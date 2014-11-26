@@ -5,6 +5,11 @@ A program to plot a graph of student enrolments over a period of
 time, based on data downloaded from the University of Melbourne LMS system.
 
 The LMS allows you to download a history of student enrolments as a CSV file.
+
+You can produce this file in the LMS by going to:
+
+    "Users and Groups" -> "Enrolment Changes" -> "Export"
+
 Rows in the file have the format:
 
     DATE,LAST_NAME,GIVEN_NAMES,STUDENT_NUMBER,USERNAME,ACTION
